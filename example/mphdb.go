@@ -31,7 +31,7 @@ import (
 
 	"github.com/opencoff/go-mph"
 
-	flag "github.com/spf13/pflag"
+	flag "github.com/opencoff/pflag"
 )
 
 type value struct {

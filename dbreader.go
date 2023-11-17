@@ -24,7 +24,7 @@ import (
 	"crypto/subtle"
 
 	"github.com/dchest/siphash"
-	"github.com/opencoff/golang-lru"
+	"github.com/hashicorp/golang-lru/arc/v2"
 )
 
 // DBReader represents the query interface for a previously constructed
@@ -33,7 +33,7 @@ import (
 type DBReader struct {
 	bb MPH
 
-	cache *lru.ARCCache
+	cache *arc.ARCCache[uint64,[]byte]
 
 	flags uint32
 
@@ -115,7 +115,7 @@ func NewDBReader(fn string, cache int) (rd *DBReader, err error) {
 		return nil, fmt.Errorf("%s: corrupt header1", fn)
 	}
 
-	rd.cache, err = lru.NewARC(cache)
+	rd.cache, err = arc.NewARC[uint64, []byte](cache)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +223,7 @@ func (rd *DBReader) DumpMeta(w io.Writer) {
 // the record checksum failed.
 func (rd *DBReader) Find(key uint64) ([]byte, error) {
 	if v, ok := rd.cache.Get(key); ok {
-		return v.([]byte), nil
+		return v, nil
 	}
 
 	// Not in cache. So, go to disk and find it.
