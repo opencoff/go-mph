@@ -16,6 +16,7 @@
 // warranty; it is provided "as is". No claim  is made to its
 // suitability for any purpose.
 
+//go:build ppc64 || mips || mips64
 // +build ppc64 mips mips64
 
 package mph

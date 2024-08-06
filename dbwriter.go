@@ -59,6 +59,15 @@ const (
 	_Magic_BBHash = "MPHB"
 )
 
+// writer state
+type wstate int
+
+const (
+	_Aborted = -1
+	_Open    = 0
+	_Frozen  = 1
+)
+
 // DBWriter represents an abstraction to construct a read-only MPH database.
 // The underlying MPHF is either CHD or BBHash. Keys and values are represented
 // as arbitrary byte sequences ([]byte). The values are stored sequentially in
@@ -86,10 +95,10 @@ type DBWriter struct {
 
 	valSize uint64
 
-	fntmp  string // tmp file name
-	fn     string // final file holding the PHF
-	frozen bool
-	magic  string
+	fntmp string // tmp file name
+	fn    string // final file holding the PHF
+	state wstate
+	magic string
 }
 
 // things associated with each key/value pair
@@ -163,7 +172,7 @@ func (w *DBWriter) Filename() string {
 // keys are discarded.
 // Returns number of records added.
 func (w *DBWriter) AddKeyVals(keys []uint64, vals [][]byte) (int, error) {
-	if w.frozen {
+	if w.state != _Open {
 		return 0, ErrFrozen
 	}
 
@@ -186,7 +195,7 @@ func (w *DBWriter) AddKeyVals(keys []uint64, vals [][]byte) (int, error) {
 
 // Adds adds a single key,value pair.
 func (w *DBWriter) Add(key uint64, val []byte) error {
-	if w.frozen {
+	if w.state != _Open {
 		return ErrFrozen
 	}
 
@@ -196,17 +205,37 @@ func (w *DBWriter) Add(key uint64, val []byte) error {
 	return nil
 }
 
+// Abort a construction
+func (w *DBWriter) Abort() error {
+	if w.state != _Open {
+		return ErrFrozen
+	}
+
+	return w.abort()
+}
+
+func (w *DBWriter) abort() error {
+	if err := os.Remove(w.fd.Name()); err != nil {
+		return err
+	}
+
+	if err := w.fd.Close(); err != nil {
+		return err
+	}
+	w.state = _Aborted
+	return nil
+}
+
 // Freeze builds the minimal perfect hash, writes the DB and closes it.
 func (w *DBWriter) Freeze() (err error) {
-	defer func() {
+	defer func(e *error) {
 		// undo the tmpfile
-		if err != nil {
-			w.fd.Close()
-			os.Remove(w.fntmp)
+		if *e != nil {
+			w.abort()
 		}
-	}()
+	}(&err)
 
-	if w.frozen {
+	if w.state != _Open {
 		return ErrFrozen
 	}
 
@@ -299,17 +328,19 @@ func (w *DBWriter) Freeze() (err error) {
 		return err
 	}
 
-	w.frozen = true
-	w.fd.Sync()
-	w.fd.Close()
+	if err = w.fd.Sync(); err != nil {
+		return err
+	}
 
-	return os.Rename(w.fntmp, w.fn)
-}
+	if err = w.fd.Close(); err != nil {
+		return err
+	}
 
-// Abort stops the construction of the perfect hash db
-func (w *DBWriter) Abort() {
-	w.fd.Close()
-	os.Remove(w.fntmp)
+	if err = os.Rename(w.fntmp, w.fn); err != nil {
+		return err
+	}
+	w.state = _Frozen
+	return nil
 }
 
 // write the offset mapping table and value-len table

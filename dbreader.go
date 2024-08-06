@@ -18,22 +18,23 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"syscall"
+	"strings"
 
 	"crypto/sha512"
 	"crypto/subtle"
 
 	"github.com/dchest/siphash"
 	"github.com/hashicorp/golang-lru/arc/v2"
+	"github.com/opencoff/go-mmap"
 )
 
 // DBReader represents the query interface for a previously constructed
 // constant database (built using NewDBWriter()). The only meaningful
 // operation on such a database is Lookup().
 type DBReader struct {
-	bb MPH
+	mph MPH
 
-	cache *arc.ARCCache[uint64,[]byte]
+	cache *arc.ARCCache[uint64, []byte]
 
 	flags uint32
 
@@ -48,9 +49,9 @@ type DBReader struct {
 	offtbl uint64
 
 	// original mmap slice
-	mmap []byte
-	fd   *os.File
-	fn   string
+	mm *mmap.Mapping
+	fd *os.File
+	fn string
 }
 
 // NewDBReader reads a previously construct database in file 'fn'
@@ -125,7 +126,9 @@ func NewDBReader(fn string, cache int) (rd *DBReader, err error) {
 
 	// mmap the offset table
 	mmapsz := st.Size() - int64(offtbl) - 32
-	bs, err := syscall.Mmap(int(fd.Fd()), int64(offtbl), int(mmapsz), syscall.PROT_READ, syscall.MAP_PRIVATE)
+	mm := mmap.New(fd)
+
+	mapping, err := mm.Map(mmapsz, int64(offtbl), mmap.PROT_READ, mmap.F_READAHEAD)
 	if err != nil {
 		return nil, fmt.Errorf("%s: can't mmap %d bytes at off %d: %w",
 			fn, mmapsz, offtbl, err)
@@ -139,20 +142,21 @@ func NewDBReader(fn string, cache int) (rd *DBReader, err error) {
 		vlensz = 0
 	}
 
-	rd.mmap = bs
+	bs := mapping.Bytes()
+	rd.mm = mapping
 	rd.offset = bsToUint64Slice(bs[:offsz])
 	if vlensz > 0 {
 		rd.vlen = bsToUint32Slice(bs[offsz : offsz+vlensz])
 	}
 
 	// The MPH table starts here
-	var bb MPH
+	var mph MPH
 	switch magic {
 	case _Magic_CHD:
-		bb, err = newChd(bs[offsz+vlensz:])
+		mph, err = newChd(bs[offsz+vlensz:])
 
 	case _Magic_BBHash:
-		bb, err = newBBHash(bs[offsz+vlensz:])
+		mph, err = newBBHash(bs[offsz+vlensz:])
 
 	default:
 		return nil, fmt.Errorf("unknown MPH DB type '%s'", magic)
@@ -162,7 +166,7 @@ func NewDBReader(fn string, cache int) (rd *DBReader, err error) {
 		return nil, fmt.Errorf("%s: can't unmarshal MPH index: %w", fn, err)
 	}
 
-	rd.bb = bb
+	rd.mph = mph
 	return rd, nil
 }
 
@@ -174,11 +178,11 @@ func (rd *DBReader) Len() int {
 
 // Close closes the db
 func (rd *DBReader) Close() {
-	syscall.Munmap(rd.mmap)
+	rd.mm.Unmap()
 	rd.fd.Close()
 	rd.cache.Purge()
 	rd.salt = nil
-	rd.bb = nil
+	rd.mph = nil
 	rd.fd = nil
 	rd.fn = ""
 }
@@ -196,19 +200,13 @@ func (rd *DBReader) Lookup(key uint64) ([]byte, bool) {
 
 // Dump the metadata to io.Writer 'w'
 func (rd *DBReader) DumpMeta(w io.Writer) {
-	if (rd.flags & _DB_KeysOnly) > 0 {
-		fmt.Fprintf(w, "MPH: <KEYS> %d keys, hash-salt %#x, offtbl at %#x\n",
-			rd.nkeys, rd.salt, rd.offtbl)
+	fmt.Fprintf(w, rd.Desc())
 
-		rd.bb.DumpMeta(w)
+	if (rd.flags & _DB_KeysOnly) > 0 {
 		for i := uint64(0); i < rd.nkeys; i++ {
 			fmt.Fprintf(w, "  %3d: %x\n", i, rd.offset[i])
 		}
 	} else {
-		fmt.Fprintf(w, "MPH: <KEYS+VALS> %d keys, hash-salt %#x, offtbl at %#x\n",
-			rd.nkeys, rd.salt, rd.offtbl)
-
-		rd.bb.DumpMeta(w)
 		for i := uint64(0); i < rd.nkeys; i++ {
 			j := i * 2
 			h := rd.offset[j]
@@ -216,6 +214,21 @@ func (rd *DBReader) DumpMeta(w io.Writer) {
 			fmt.Fprintf(w, "  %3d: %#x, %d bytes at %#x\n", i, h, rd.vlen[i], o)
 		}
 	}
+}
+
+// Desc provides a human description of the MPH db
+func (rd *DBReader) Desc() string {
+	var w strings.Builder
+
+	if (rd.flags & _DB_KeysOnly) > 0 {
+		fmt.Fprintf(&w, "MPH: <KEYS> %d keys, hash-salt %#x, offtbl at %#x\n",
+			rd.nkeys, rd.salt, rd.offtbl)
+	} else {
+		fmt.Fprintf(&w, "MPH: <KEYS+VALS> %d keys, hash-salt %#x, offtbl at %#x\n",
+			rd.nkeys, rd.salt, rd.offtbl)
+	}
+	rd.mph.DumpMeta(&w)
+	return w.String()
 }
 
 // Find looks up 'key' in the table and returns the corresponding value.
@@ -228,7 +241,7 @@ func (rd *DBReader) Find(key uint64) ([]byte, error) {
 
 	// Not in cache. So, go to disk and find it.
 	// We are guaranteed that: 0 <= i < rd.nkeys
-	i, ok := rd.bb.Find(key)
+	i, ok := rd.mph.Find(key)
 	if !ok {
 		return nil, ErrNoKey
 	}
@@ -260,6 +273,44 @@ func (rd *DBReader) Find(key uint64) ([]byte, error) {
 
 	rd.cache.Add(key, val)
 	return val, nil
+}
+
+// IterFunc iterates through every record of the MPH db and
+// calls 'fp' on each. If the called function returns non-nil,
+// it stops the iteration and the error is propogated to the caller.
+func (rd *DBReader) IterFunc(fp func(k uint64, v []byte) error) error {
+
+	switch {
+	case rd.flags&_DB_KeysOnly > 0:
+		for i := uint64(0); i < rd.nkeys; i++ {
+			k := rd.offset[i]
+			if k == 0 {
+				continue
+			}
+			if err := fp(k, nil); err != nil {
+				return err
+			}
+		}
+	default:
+		// iter keys + values
+		for i := uint64(0); i < rd.nkeys; i++ {
+			j := i * 2
+			k := rd.offset[j]
+			if k == 0 {
+				continue
+			}
+			vl := rd.vlen[i]
+			off := rd.offset[j+1]
+			val, err := rd.decodeRecord(off, vl)
+			if err != nil {
+				return fmt.Errorf("iter: key %x: read-record: %w", k, err)
+			}
+			if err := fp(k, val); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // read the next full record at offset 'off' - by seeking to that offset.

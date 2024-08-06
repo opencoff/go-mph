@@ -70,10 +70,8 @@ func TestCHDMarshal(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	n, err := c.MarshalBinary(&buf)
+	_, err = c.MarshalBinary(&buf)
 	assert(err == nil, "marshal failed: %s", err)
-
-	t.Logf("marshal size: %d bytes\n", n)
 
 	mp, err := newChd(buf.Bytes())
 	assert(err == nil, "unmarshal failed: %s", err)

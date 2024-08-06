@@ -13,8 +13,8 @@
 
 // Package mph implements two different perfect hash functions for
 // large data sets:
-//    1. Compress Hash Displace: http://cmph.sourceforge.net/papers/esa09.pdf
-//    2. BBHash: https://arxiv.org/abs/1702.03154).
+//  1. Compress Hash Displace: http://cmph.sourceforge.net/papers/esa09.pdf
+//  2. BBHash: https://arxiv.org/abs/1702.03154).
 //
 // mph exposes a convenient way to serialize keys and values OR just keys
 // into an on-disk single-file database. This serialized MPH DB is useful

@@ -371,7 +371,8 @@ func (s *state) appendRedo(k []uint64) {
 // append the current A to the bits vector and begin new iteration
 // return new keys and a new A.
 // NB: This is *always* called from a single-threaded context
-//     (i.e., synchronization point).
+//
+//	(i.e., synchronization point).
 func (s *state) nextLevel() ([]uint64, *bitVector) {
 	s.bb.bits = append(s.bb.bits, s.A)
 	s.A = nil

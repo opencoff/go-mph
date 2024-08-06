@@ -20,13 +20,6 @@ read-dominant workloads. The typical pattern in such situations is
 to build the constant-DB _once_ for efficient retrieval and do
 lookups multiple times.
 
-`go-mph` uses checksums on each individual record and
-reads, verifies them opportunistically on-demand. The DB reader uses
-an in-memory cache for speeding up previous lookups.
-
-The MPH tables and other metadata are protected with a strong
-checksum (SHA256).
-
 *NOTE* Minimal Perfect Hash functions take a fixed input and
 generate a mapping to lookup the items in constant time. In
 particular, they are NOT a replacement for a traditional hash-table;
@@ -42,6 +35,13 @@ present during construction. In concrete terms:
 The way one deals with this is to compare the actual keys stored
 against that index. `DBReader()`'s `Find()` method demonstrates how
 this is done.
+
+`go-mph` uses cryptographically strong checksum on the entire MPH DB *metadata*.
+Additionally, tt uses siphash-2-4 checksums on each individual key-val 
+record. This siphash checksum is verified opportunistically when keys
+are looked up in the MPH DB.  The DB reader uses
+an in-memory cache for speeding up lookups.
+
 
 
 ## How do I use it?
@@ -70,18 +70,7 @@ The library exposes the following types:
   `Find()` method. A convenience method `Lookup()` elides errors and
   only returns the value and a boolean.
 
-
-## Example Program
-There is a working example of the `DBWriter` and `DBReader` APIs in the
-file *example/mphdb.go*. This example demonstrates the following functionality:
-
-- add one or more space delimited key/value files (first field is key, second
-  field is value)
-- add one or more CSV files (first field is key, second field is value)
-- Write the resulting MPH DB to disk
-- Read the DB and verify its integrity
-
-First, lets run some tests and make sure chd is working fine:
+First, lets run some tests and make sure mph is working fine:
 
 ```sh
 
@@ -91,15 +80,30 @@ First, lets run some tests and make sure chd is working fine:
 
 ```
 
+## Example Program
+There is a working example of the `DBWriter` and `DBReader` APIs in 
+the `example/` sub directory. This example demonstrates the following
+functionality:
+
+- add one or more space delimited key/value files (first field is key, second
+  field is value)
+- add one or more CSV files (first field is key, second field is value)
+- Write the resulting MPH DB to disk
+- Read the DB and verify its integrity
+- Dump the contents of the DB or the DB "meta data"
+
 Now, lets build and run the example program:
 ```sh
 
   $ make
   $ ./mphdb -h
-  $ ./mphdb -t chd foo.db /usr/share/dict/words
+  $ ./mphdb -V make foo.db chd /usr/share/dict/words
+  $ ./mphdb -V fsck foo.db
+  $ ./mphdb -V dump -m foo.db
+  $ ./mphdb -V dump -a foo.db
 ```
 
-This example program stores the words in the system dictionary into
+This example above stores the words in the system dictionary into
 a fast-lookup table using the CHD algorithm. `mphdb -h` shows you a helpful usage for what
 else you can do with the example program.
 
@@ -120,8 +124,8 @@ Once you have the input generated, you can feed it to the `example` program abov
 a MPH DB:
 ```sh
 
-  $ ./mphdb chd foo.db a.txt
-  $ ./mphdb -V foo.db
+  $ ./mphdb make foo.db chd a.txt
+  $ ./mphdb fsck foo.db
 ```
 
 It is possible that "mphdb" fails to construct a DB after trying 1,000,000 times. In that case,
@@ -129,13 +133,12 @@ try lowering the "load" factor (default is 0.85).
 
 ```sh
 
-  $ ./mphdb -l 0.75 foo.db a.txt
+  $ ./mphdb make -l 0.75 foo.db chd a.txt
 ```
 
-## Writing a DB Once, but lookup many times
-
 The example program in `example/` has helper routines to add from a
-text or CSV delimited file: see `example/text.go`.
+text or CSV delimited file: see `example/text.go`. In fact is is a more-or-less complete
+usage of the MPH library API.
 
 ## Implementation Notes
 
