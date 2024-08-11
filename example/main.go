@@ -63,7 +63,17 @@ Options:
 		os.Exit(0)
 	}
 
-	fs.Parse(os.Args[1:])
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		die("%s", err)
+	}
+
+	args := fs.Args()
+	if len(args) < 2 {
+		fmt.Printf(usage)
+		fs.PrintDefaults()
+		os.Exit(0)
+	}
+
 	err := runCommand(fs.Args(), &opt)
 	if err != nil {
 		die("%s", err)
