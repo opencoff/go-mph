@@ -56,7 +56,7 @@ const _Gamma float64 = 2.0
 // Maximum number of attempts (level) at making a perfect hash function.
 // Per the paper, each successive level exponentially reduces the
 // probability of collision.
-const _MaxLevel uint32 = 2000
+const _MaxLevel uint32 = 4000
 
 // Minimum number of keys before bbhash switches to a concurrent
 // construction algorithm

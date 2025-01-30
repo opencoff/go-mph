@@ -33,6 +33,7 @@ func init() {
 func (m *makeCommand) run(args []string, opt *Option) (err error) {
 	var load, gamma float64
 	var db *mph.DBWriter
+	var ftype string
 
 	defer func(e *error) {
 		if *e != nil && db != nil {
@@ -44,6 +45,7 @@ func (m *makeCommand) run(args []string, opt *Option) (err error) {
 	fs.SetOutput(os.Stdout)
 	fs.Float64VarP(&load, "load", "l", 0.85, "Use `L` as the CHD hash table load factor")
 	fs.Float64VarP(&gamma, "gamma", "g", 2.0, "Use `G` as the 'gamma' for BBHash")
+	fs.StringVarP(&ftype, "file-type", "t", "txt", "Treat the file-type as `T` (txt|csv)")
 	fs.Usage = func() {
 		fmt.Printf(`Usage: make [options] DB TYPE [INPUT...]
 
@@ -77,6 +79,8 @@ options:
 	typ := args[1]
 	args = args[2:]
 
+	ftype = strings.ToLower(ftype)
+
 	switch typ {
 	case "chd":
 		db, err = mph.NewChdDBWriter(fn, load)
@@ -104,7 +108,16 @@ options:
 				n, err = AddCSVFile(db, f, ',', '#', 0, 1)
 
 			default:
-				return fmt.Errorf("make: don't know how to add %s", f)
+				switch ftype {
+				case "txt", "text":
+					n, err = AddTextFile(db, f, " \t")
+
+				case "csv":
+					n, err = AddCSVFile(db, f, ',', '#', 0, 1)
+
+				default:
+					return fmt.Errorf("make: don't know how to add %s", f)
+				}
 			}
 
 			if err != nil {

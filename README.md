@@ -76,7 +76,7 @@ First, lets run some tests and make sure mph is working fine:
 
   $ git clone https://github.com/opencoff/go-mph
   $ cd go-mph
-  $ make test
+  $ go test .
 
 ```
 
@@ -96,8 +96,8 @@ Now, lets build and run the example program:
 ```sh
 
   $ make
-  $ ./mphdb -h
-  $ ./mphdb -V make foo.db chd /usr/share/dict/words
+  $ go build -o mphdb ./example
+  $ ./mphdb -V make foo.db -t txt chd /usr/share/dict/words
   $ ./mphdb -V fsck foo.db
   $ ./mphdb -V dump -m foo.db
   $ ./mphdb -V dump -a foo.db
