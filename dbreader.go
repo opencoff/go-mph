@@ -204,14 +204,14 @@ func (rd *DBReader) DumpMeta(w io.Writer) {
 
 	if (rd.flags & _DB_KeysOnly) > 0 {
 		for i := uint64(0); i < rd.nkeys; i++ {
-			fmt.Fprintf(w, "  %3d: %x\n", i, rd.offset[i])
+			fmt.Fprintf(w, "  %3d: %x\n", i, toLEUint64(rd.offset[i]))
 		}
 	} else {
 		for i := uint64(0); i < rd.nkeys; i++ {
 			j := i * 2
-			h := rd.offset[j]
-			o := rd.offset[j+1]
-			fmt.Fprintf(w, "  %3d: %#x, %d bytes at %#x\n", i, h, rd.vlen[i], o)
+			h := toLEUint64(rd.offset[j])
+			o := toLEUint64(rd.offset[j+1])
+			fmt.Fprintf(w, "  %3d: %#x, %d bytes at %#x\n", i, h, toLEUint32(rd.vlen[i]), o)
 		}
 	}
 }
@@ -247,7 +247,7 @@ func (rd *DBReader) Find(key uint64) ([]byte, error) {
 	}
 	if (rd.flags & _DB_KeysOnly) > 0 {
 		// offtbl is just the keys; no values.
-		if hash := toLittleEndianUint64(rd.offset[i]); hash != key {
+		if hash := toLEUint64(rd.offset[i]); hash != key {
 			return nil, ErrNoKey
 		}
 
@@ -258,15 +258,15 @@ func (rd *DBReader) Find(key uint64) ([]byte, error) {
 	// we have keys _and_ values
 
 	j := i * 2
-	if hash := toLittleEndianUint64(rd.offset[j]); hash != key {
+	if hash := toLEUint64(rd.offset[j]); hash != key {
 		return nil, ErrNoKey
 	}
 
 	var val []byte
 	var err error
 
-	vlen := toLittleEndianUint32(rd.vlen[i])
-	off := toLittleEndianUint64(rd.offset[j+1])
+	vlen := toLEUint32(rd.vlen[i])
+	off := toLEUint64(rd.offset[j+1])
 	if val, err = rd.decodeRecord(off, vlen); err != nil {
 		return nil, err
 	}
