@@ -283,7 +283,7 @@ func (rd *DBReader) IterFunc(fp func(k uint64, v []byte) error) error {
 	switch {
 	case rd.flags&_DB_KeysOnly > 0:
 		for i := uint64(0); i < rd.nkeys; i++ {
-			k := rd.offset[i]
+			k := toLEUint64(rd.offset[i])
 			if k == 0 {
 				continue
 			}
@@ -295,12 +295,12 @@ func (rd *DBReader) IterFunc(fp func(k uint64, v []byte) error) error {
 		// iter keys + values
 		for i := uint64(0); i < rd.nkeys; i++ {
 			j := i * 2
-			k := rd.offset[j]
+			k := toLEUint64(rd.offset[j])
 			if k == 0 {
 				continue
 			}
-			vl := rd.vlen[i]
-			off := rd.offset[j+1]
+			vl := toLEUint32(rd.vlen[i])
+			off := toLEUint64(rd.offset[j+1])
 			val, err := rd.decodeRecord(off, vl)
 			if err != nil {
 				return fmt.Errorf("iter: key %x: read-record: %w", k, err)
