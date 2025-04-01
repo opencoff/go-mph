@@ -6,9 +6,9 @@ github.com/hashicorp/golang-lru/v2 v2.0.7 h1:a+bsQ5rvGLjzHuww6tVxozPZFVghXaHOwFs
 github.com/hashicorp/golang-lru/v2 v2.0.7/go.mod h1:QeFd9opnmA6QUJc5vARoKUSoFhyfM2/ZepoAG6RGpeM=
 github.com/opencoff/go-fasthash v0.0.0-20180406145558-aed761496075 h1:E6jK9PFTGb2trsAstgycRMavAki/W1NDF8aQ636Qf/k=
 github.com/opencoff/go-fasthash v0.0.0-20180406145558-aed761496075/go.mod h1:MwRUIaK13/MmcsYPJVhMELsWvP1PQjTZeNn442GPpU4=
-github.com/opencoff/go-mmap v0.1.5 h1:RKPtevC4mOW5bi9skBPPo4nFTIH4lVWAL20Tff+FjLg=
-github.com/opencoff/go-mmap v0.1.5/go.mod h1:y/6Jk/tDUc00k3oSQpiJX++20Nw7xFSlc5kLkhGnRXw=
+github.com/opencoff/go-mmap v0.1.6 h1:qBmmiB+7nKym6iK461QJbwgS0RluR0l7CxUN2AVAFdU=
+github.com/opencoff/go-mmap v0.1.6/go.mod h1:dI9V9pbsY3qYL6dM3M7yvW9xW9cgSPjnd+cH4T7XsXE=
 github.com/opencoff/pflag v1.0.7 h1:o5cQIuX75bDcdJ6AXl68gzpA72a3CJ2MPStaMnEuwi4=
 github.com/opencoff/pflag v1.0.7/go.mod h1:2bXtpAD/5h/2LarkbsRwiUxqnvB1nZBzn9Xjad1P41A=
-golang.org/x/sys v0.28.0 h1:Fksou7UEQUWlKvIdsqzJmUmCX3cZuD2+P3XyyzwMhlA=
-golang.org/x/sys v0.28.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
+golang.org/x/sys v0.31.0 h1:ioabZlmFYtWhL+TRYpcnNlLwhyxaM9kWTDEmfnprqik=
+golang.org/x/sys v0.31.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=

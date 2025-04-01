@@ -200,7 +200,7 @@ func (rd *DBReader) Lookup(key uint64) ([]byte, bool) {
 
 // Dump the metadata to io.Writer 'w'
 func (rd *DBReader) DumpMeta(w io.Writer) {
-	fmt.Fprintf(w, rd.Desc())
+	fmt.Fprintf(w, "%s", rd.Desc())
 
 	if (rd.flags & _DB_KeysOnly) > 0 {
 		for i := uint64(0); i < rd.nkeys; i++ {
